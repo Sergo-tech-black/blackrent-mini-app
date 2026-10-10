@@ -194,7 +194,9 @@ export default function App() {
           <img src={car.photo} alt="" />
           <div className="info">
             <b>{car.brand} {car.model}</b>
-            <span>{car.year > 0 ? `${car.year} · ` : ''}{car.transmission}</span>
+            <span className="car-sub">
+              {car.year > 0 ? `${car.year} · ` : ''}{car.transmission}
+            </span>
             <span className="price">{car.price} ₽ / сутки</span>
           </div>
         </div>
