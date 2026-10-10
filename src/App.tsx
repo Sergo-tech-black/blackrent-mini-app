@@ -60,7 +60,7 @@ export default function App() {
     setError('');
 
     try {
-      const res = await fetch('/api/booking', {
+      const res = await fetch('https://blackrent-mini-app.vercel.app/api/booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
