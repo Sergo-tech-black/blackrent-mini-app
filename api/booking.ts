@@ -1,4 +1,3 @@
-// Serverless-функция Vercel: принимает заявку из Mini App и шлёт её в Telegram
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -13,11 +12,22 @@ export default async function handler(req: any, res: any) {
 
   const {
     car, days, pricePerDay, base, discount, percent, total,
-    name, phone, tgUser, tgId,
+    name, phone, tgUser, tgId, tgFirstName, tgLastName,
   } = req.body || {};
 
   if (!car || !phone) {
     return res.status(400).json({ error: 'Missing fields' });
+  }
+
+  // Формируем строку с Telegram-информацией
+  let tgLine = 'Telegram: —';
+  if (tgUser) {
+    tgLine = `Telegram: @${tgUser}`;
+  } else if (tgId) {
+    const fullName = [tgFirstName, tgLastName].filter(Boolean).join(' ');
+    tgLine = fullName
+      ? `Telegram: ${fullName} (ID: ${tgId})`
+      : `Telegram: ID ${tgId}`;
   }
 
   const text = [
@@ -32,7 +42,7 @@ export default async function handler(req: any, res: any) {
     '',
     `Клиент: ${name || '—'}`,
     `Телефон: ${phone}`,
-    tgUser ? `Telegram: @${tgUser}` : (tgId ? `Telegram ID: ${tgId}` : 'Telegram: —'),
+    tgLine,
   ].filter(Boolean).join('\n');
 
   try {

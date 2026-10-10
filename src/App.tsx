@@ -6,15 +6,12 @@ import './App.css';
 type Car = typeof cars[0];
 
 // ⚙️ Настройки скидок. Меняйте цифры под себя.
-// minDays — от какого количества суток действует скидка
-// percent — размер скидки в процентах
 const DISCOUNTS = [
   { minDays: 20, percent: 20 },
   { minDays: 10, percent: 15 },
   { minDays: 5,  percent: 10 },
 ];
 
-// Возвращает размер скидки в % для указанного числа суток
 function getDiscountPercent(days: number): number {
   for (const d of DISCOUNTS) {
     if (days >= d.minDays) return d.percent;
@@ -22,13 +19,28 @@ function getDiscountPercent(days: number): number {
   return 0;
 }
 
-// Считает итоговую стоимость: база, скидка, итог
 function calcPrice(pricePerDay: number, days: number) {
   const base = pricePerDay * days;
   const percent = getDiscountPercent(days);
   const discount = Math.round(base * percent / 100);
   const total = base - discount;
   return { base, percent, discount, total };
+}
+
+// 🔍 Надёжно достаём данные пользователя из Telegram.
+// Пробуем сначала window.Telegram.WebApp (там всегда актуально),
+// если не вышло — fallback на @twa-dev/sdk.
+function getTgUser(): any {
+  try {
+    const tg: any = (window as any).Telegram?.WebApp;
+    const u = tg?.initDataUnsafe?.user;
+    if (u?.id) return u;
+  } catch {}
+  try {
+    const u: any = (WebApp as any)?.initDataUnsafe?.user;
+    if (u?.id) return u;
+  } catch {}
+  return null;
 }
 
 export default function App() {
@@ -42,9 +54,14 @@ export default function App() {
 
   useEffect(() => {
     try {
+      (window as any).Telegram?.WebApp?.ready?.();
+      (window as any).Telegram?.WebApp?.expand?.();
       WebApp?.ready?.();
       WebApp?.expand?.();
-      setName(WebApp?.initDataUnsafe?.user?.first_name ?? '');
+      const u = getTgUser();
+      if (u?.first_name) {
+        setName(u.first_name);
+      }
     } catch (e) {
       console.log('Telegram WebApp недоступен — работаем в браузере', e);
     }
@@ -58,6 +75,8 @@ export default function App() {
     if (!selectedCar || !phone) return;
     setSending(true);
     setError('');
+
+    const u = getTgUser();
 
     try {
       const res = await fetch('https://blackrent-mini-app.vercel.app/api/booking', {
@@ -73,8 +92,10 @@ export default function App() {
           total: price.total,
           name,
           phone,
-          tgUser: WebApp?.initDataUnsafe?.user?.username ?? null,
-          tgId: WebApp?.initDataUnsafe?.user?.id ?? null,
+          tgUser: u?.username ?? null,
+          tgId: u?.id ?? null,
+          tgFirstName: u?.first_name ?? null,
+          tgLastName: u?.last_name ?? null,
         }),
       });
 
@@ -123,7 +144,6 @@ export default function App() {
         <input type="number" min={1} value={days}
                onChange={e => setDays(Math.max(1, Number(e.target.value)))} />
 
-        {/* Подсказка про скидку */}
         {price.percent > 0 && (
           <p className="discount-hint">
             🎉 Скидка {price.percent}% при аренде от {DISCOUNTS.find(d => d.percent === price.percent)?.minDays} суток
@@ -135,7 +155,6 @@ export default function App() {
           </p>
         )}
 
-        {/* Строки с ценой */}
         <div className="price-breakdown">
           <div className="row">
             <span>Стоимость за {days} сут.</span>
