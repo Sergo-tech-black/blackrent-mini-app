@@ -688,3 +688,105 @@ button.primary:disabled {
 .card-photo {
   position: relative;
 }
+/* ===== АДМИН-ПАНЕЛЬ ===== */
+.admin-open-btn {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(255, 149, 0, 0.15), rgba(255, 107, 0, 0.08));
+  border: 1px solid rgba(255, 149, 0, 0.4);
+  color: var(--brand-orange);
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 12px;
+  font-family: inherit;
+}
+
+.admin-open-btn:active { transform: scale(0.98); }
+
+.admin-title {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 8px 0 6px;
+}
+
+.admin-hint {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 18px;
+  line-height: 1.4;
+}
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-row {
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+}
+
+.admin-row-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+  gap: 8px;
+}
+
+.admin-row-info b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+.admin-row-id {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.admin-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.admin-btn {
+  flex: 1;
+  padding: 9px 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-main);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.admin-btn:active { transform: scale(0.95); }
+
+.admin-btn.active-green {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #4ade80;
+}
+
+.admin-btn.active-red {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #f87171;
+}
+
+.admin-btn.active-gray {
+  background: rgba(120, 120, 120, 0.2);
+  border-color: rgba(120, 120, 120, 0.5);
+  color: #aaa;
+}

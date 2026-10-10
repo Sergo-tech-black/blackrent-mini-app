@@ -6,14 +6,15 @@ import './App.css';
 type Car = typeof cars[0];
 type CarStatus = 'available' | 'busy' | 'service';
 
-// ⚙️ Настройки скидок
+// 👤 Ваш Telegram ID — только вы видите кнопку управления
+const ADMIN_IDS = ['1848294582'];
+
 const DISCOUNTS = [
   { minDays: 20, percent: 20 },
   { minDays: 10, percent: 15 },
   { minDays: 5,  percent: 10 },
 ];
 
-// 💰 Ценовые диапазоны
 const PRICE_RANGES = [
   { label: 'Все цены', min: 0, max: Infinity },
   { label: 'до 3 000 ₽', min: 0, max: 3000 },
@@ -22,10 +23,7 @@ const PRICE_RANGES = [
   { label: 'от 10 000 ₽', min: 10000, max: Infinity },
 ];
 
-// ⏱️ Быстрые варианты срока аренды
 const QUICK_DAYS = [1, 3, 5, 7, 10, 14, 30];
-
-// 📞 Контакты менеджера
 const MANAGER_PHONE = '+79990000000';
 const MANAGER_TG = 'blackrent_spb';
 
@@ -55,6 +53,19 @@ function getTgUser(): any {
     if (u?.id) return u;
   } catch {}
   return null;
+}
+
+function getInitData(): string {
+  try {
+    return (window as any).Telegram?.WebApp?.initData ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function isAdminUser(): boolean {
+  const u = getTgUser();
+  return u?.id && ADMIN_IDS.includes(String(u.id));
 }
 
 function formatPhone(value: string): string {
@@ -92,14 +103,6 @@ function normalizeBody(body: string): string {
   return map[key] || body || 'Прочее';
 }
 
-// 🚦 Получить статус машины
-function getStatus(car: any): CarStatus {
-  const s = (car?.status || 'available') as CarStatus;
-  if (s === 'busy' || s === 'service') return s;
-  return 'available';
-}
-
-// 📅 Форматировать дату до которой занята
 function formatBusyUntil(dateStr?: string): string {
   if (!dateStr) return '';
   try {
@@ -113,14 +116,33 @@ function formatBusyUntil(dateStr?: string): string {
   }
 }
 
-// 🏷️ Текст и цвет бейджа
-function statusInfo(car: any): { text: string; className: string } | null {
-  const s = getStatus(car);
-  if (s === 'available') return null;
-  if (s === 'service') return { text: 'На обслуживании', className: 'status-service' };
-  const until = formatBusyUntil(car?.busyUntil);
+// Дата возврата в будущем?
+function isStillBusy(busyUntil?: string): boolean {
+  if (!busyUntil) return true;
+  const end = new Date(busyUntil);
+  if (isNaN(end.getTime())) return true;
+  end.setHours(23, 59, 59, 999);
+  return end.getTime() >= Date.now();
+}
+
+type StatusMap = Record<string, { status: CarStatus; busyUntil?: string }>;
+
+function getStatus(id: number, map: StatusMap): CarStatus {
+  const entry = map[String(id)];
+  if (!entry) return 'available';
+  if (entry.status === 'busy' && entry.busyUntil && !isStillBusy(entry.busyUntil)) {
+    return 'available';
+  }
+  return entry.status;
+}
+
+function statusInfo(status: CarStatus, busyUntil?: string) {
+  if (status === 'available') return null;
+  if (status === 'service') return { text: 'На обслуживании', short: 'ТО', className: 'status-service' };
+  const until = formatBusyUntil(busyUntil);
   return {
     text: until ? `Занята до ${until}` : 'Занята',
+    short: 'Занята',
     className: 'status-busy',
   };
 }
@@ -138,7 +160,10 @@ export default function App() {
   const [sortOrder, setSortOrder] = useState<'none' | 'asc' | 'desc'>('none');
   const [search, setSearch] = useState('');
   const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [statusMap, setStatusMap] = useState<StatusMap>({});
+  const [showAdmin, setShowAdmin] = useState(false);
 
+  // Загружаем статусы из API при старте
   useEffect(() => {
     try {
       (window as any).Telegram?.WebApp?.ready?.();
@@ -150,7 +175,21 @@ export default function App() {
     } catch (e) {
       console.log('Telegram WebApp недоступен', e);
     }
+
+    loadStatuses();
   }, []);
+
+  async function loadStatuses() {
+    try {
+      const res = await fetch('https://blackrent-mini-app.vercel.app/api/statuses');
+      if (res.ok) {
+        const data = await res.json();
+        setStatusMap(data || {});
+      }
+    } catch (e) {
+      console.warn('Не удалось загрузить статусы', e);
+    }
+  }
 
   const categories = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -179,14 +218,14 @@ export default function App() {
     }
 
     if (onlyAvailable) {
-      result = result.filter(c => getStatus(c) === 'available');
+      result = result.filter(c => getStatus(c.id, statusMap) === 'available');
     }
 
     if (sortOrder === 'asc') result.sort((a, b) => a.price - b.price);
     else if (sortOrder === 'desc') result.sort((a, b) => b.price - a.price);
 
     return result;
-  }, [bodyFilter, priceRange, sortOrder, search, onlyAvailable]);
+  }, [bodyFilter, priceRange, sortOrder, search, onlyAvailable, statusMap]);
 
   const price = selectedCar
     ? calcPrice(selectedCar.price, days)
@@ -239,6 +278,34 @@ export default function App() {
     }
   }
 
+  // ===== АДМИН-ПАНЕЛЬ =====
+  async function updateStatus(
+    carId: number,
+    newStatus: CarStatus,
+    busyUntil?: string
+  ) {
+    try {
+      const res = await fetch('https://blackrent-mini-app.vercel.app/api/statuses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: carId,
+          status: newStatus,
+          busyUntil,
+          initData: getInitData(),
+        }),
+      });
+      if (!res.ok) throw new Error('Ошибка сервера');
+      const data = await res.json();
+      setStatusMap(data.data || {});
+      WebApp.HapticFeedback?.notificationOccurred('success');
+    } catch (e) {
+      console.error(e);
+      WebApp.showAlert?.('Не удалось сохранить статус');
+    }
+  }
+
+  // ===== ЭКРАН УСПЕХА =====
   if (sent) {
     return (
       <div className="wrap">
@@ -254,8 +321,65 @@ export default function App() {
     );
   }
 
+  // ===== АДМИН-ПАНЕЛЬ =====
+  if (showAdmin) {
+    return (
+      <div className="wrap">
+        <button className="back" onClick={() => setShowAdmin(false)}>← Назад к каталогу</button>
+        <h1 className="admin-title">Управление статусами</h1>
+        <p className="admin-hint">
+          Отметьте машины, которые сейчас в аренде или на ТО.
+          Клиенты сразу увидят это в каталоге.
+        </p>
+
+        <div className="admin-list">
+          {cars.map(car => {
+            const status = getStatus(car.id, statusMap);
+            const entry = statusMap[String(car.id)];
+            return (
+              <div key={car.id} className="admin-row">
+                <div className="admin-row-info">
+                  <b>{car.brand} {car.model}</b>
+                  <span className="admin-row-id">ID: {car.id}</span>
+                </div>
+                <div className="admin-row-actions">
+                  <button
+                    className={`admin-btn ${status === 'available' ? 'active-green' : ''}`}
+                    onClick={() => updateStatus(car.id, 'available')}
+                  >
+                    Свободна
+                  </button>
+                  <button
+                    className={`admin-btn ${status === 'busy' ? 'active-red' : ''}`}
+                    onClick={() => {
+                      const input = prompt('Дата возврата (ГГГГ-ММ-ДД), можно пусто:', entry?.busyUntil || '');
+                      if (input === null) return;
+                      updateStatus(car.id, 'busy', input.trim() || undefined);
+                    }}
+                  >
+                    Занята
+                  </button>
+                  <button
+                    className={`admin-btn ${status === 'service' ? 'active-gray' : ''}`}
+                    onClick={() => updateStatus(car.id, 'service')}
+                  >
+                    ТО
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // ===== ДЕТАЛЬНАЯ КАРТОЧКА =====
   if (selectedCar) {
-    const status = statusInfo(selectedCar);
+    const status = getStatus(selectedCar.id, statusMap);
+    const entry = statusMap[String(selectedCar.id)];
+    const info = statusInfo(status, entry?.busyUntil);
+
     return (
       <div className="wrap">
         <button className="back" onClick={() => setSelectedCar(null)}>← Назад</button>
@@ -263,9 +387,9 @@ export default function App() {
         <div className="detail-hero">
           <img src={selectedCar.photo} alt="" className="big-photo" />
           <div className="detail-hero-overlay">
-            {status && (
-              <span className={`status-badge-inline ${status.className}`}>
-                {status.text}
+            {info && (
+              <span className={`status-badge-inline ${info.className}`}>
+                {info.text}
               </span>
             )}
             <h1 className="detail-title">
@@ -276,18 +400,10 @@ export default function App() {
         </div>
 
         <div className="specs-chips">
-          {selectedCar.transmission && (
-            <span className="spec-chip">⚙️ {selectedCar.transmission}</span>
-          )}
-          {selectedCar.fuel && (
-            <span className="spec-chip">⛽ {selectedCar.fuel}</span>
-          )}
-          {selectedCar.body && (
-            <span className="spec-chip">🚗 {normalizeBody(selectedCar.body)}</span>
-          )}
-          {selectedCar.color && (
-            <span className="spec-chip">🎨 {selectedCar.color}</span>
-          )}
+          {selectedCar.transmission && <span className="spec-chip">⚙️ {selectedCar.transmission}</span>}
+          {selectedCar.fuel && <span className="spec-chip">⛽ {selectedCar.fuel}</span>}
+          {selectedCar.body && <span className="spec-chip">🚗 {normalizeBody(selectedCar.body)}</span>}
+          {selectedCar.color && <span className="spec-chip">🎨 {selectedCar.color}</span>}
         </div>
 
         <div className="detail-price-card">
@@ -323,14 +439,10 @@ export default function App() {
         />
 
         {price.percent > 0 && (
-          <div className="discount-badge">
-            🎉 Скидка {price.percent}% применена
-          </div>
+          <div className="discount-badge">🎉 Скидка {price.percent}% применена</div>
         )}
         {price.percent === 0 && days < 5 && (
-          <p className="discount-hint-muted">
-            От 5 суток — скидка 10%
-          </p>
+          <p className="discount-hint-muted">От 5 суток — скидка 10%</p>
         )}
 
         <div className="price-breakdown">
@@ -368,24 +480,16 @@ export default function App() {
         </button>
 
         <div className="contact-buttons">
-          <a href={`tel:${MANAGER_PHONE}`} className="contact-btn contact-btn-phone">
-            📞 Позвонить
-          </a>
-          <a
-            href={`https://t.me/${MANAGER_TG}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="contact-btn contact-btn-tg"
-          >
-            💬 Написать
-          </a>
+          <a href={`tel:${MANAGER_PHONE}`} className="contact-btn contact-btn-phone">📞 Позвонить</a>
+          <a href={`https://t.me/${MANAGER_TG}`} target="_blank" rel="noopener noreferrer" className="contact-btn contact-btn-tg">💬 Написать</a>
         </div>
 
         {similarCars.length > 0 && (
           <div className="similar-section">
             <h2 className="similar-title">Похожие авто</h2>
             {similarCars.map(car => {
-              const s = statusInfo(car);
+              const s = getStatus(car.id, statusMap);
+              const i = statusInfo(s, statusMap[String(car.id)]?.busyUntil);
               return (
                 <div
                   key={car.id}
@@ -397,11 +501,7 @@ export default function App() {
                 >
                   <div className="card-photo">
                     <img src={car.photo} alt="" />
-                    {s && (
-                      <span className={`status-badge ${s.className}`}>
-                        {getStatus(car) === 'service' ? 'ТО' : 'Занята'}
-                      </span>
-                    )}
+                    {i && <span className={`status-badge ${i.className}`}>{i.short}</span>}
                   </div>
                   <div className="info">
                     <b>{car.brand} {car.model}</b>
@@ -419,12 +519,19 @@ export default function App() {
     );
   }
 
+  // ===== КАТАЛОГ =====
   return (
     <div className="wrap">
       <header className="app-header">
         <div className="brand">BlackRent</div>
         <div className="brand-tagline">Аренда авто в Санкт-Петербург</div>
       </header>
+
+      {isAdminUser() && (
+        <button className="admin-open-btn" onClick={() => setShowAdmin(true)}>
+          ⚙️ Управление статусами
+        </button>
+      )}
 
       <div className="search-box">
         <span className="search-icon">🔍</span>
@@ -446,13 +553,13 @@ export default function App() {
         >
           Все ({cars.length})
         </button>
-        {categories.map(([name, count]) => (
+        {categories.map(([catName, count]) => (
           <button
-            key={name}
-            className={`filter-btn ${bodyFilter === name ? 'active' : ''}`}
-            onClick={() => setBodyFilter(name)}
+            key={catName}
+            className={`filter-btn ${bodyFilter === catName ? 'active' : ''}`}
+            onClick={() => setBodyFilter(catName)}
           >
-            {name} ({count})
+            {catName} ({count})
           </button>
         ))}
       </div>
@@ -501,8 +608,9 @@ export default function App() {
       )}
 
       {filteredCars.map(car => {
-        const s = statusInfo(car);
-        const isUnavailable = getStatus(car) !== 'available';
+        const s = getStatus(car.id, statusMap);
+        const info = statusInfo(s, statusMap[String(car.id)]?.busyUntil);
+        const isUnavailable = s !== 'available';
         return (
           <div
             key={car.id}
@@ -511,11 +619,7 @@ export default function App() {
           >
             <div className="card-photo">
               <img src={car.photo} alt="" />
-              {s && (
-                <span className={`status-badge ${s.className}`}>
-                  {getStatus(car) === 'service' ? 'ТО' : 'Занята'}
-                </span>
-              )}
+              {info && <span className={`status-badge ${info.className}`}>{info.short}</span>}
             </div>
             <div className="info">
               <b>{car.brand} {car.model}</b>
