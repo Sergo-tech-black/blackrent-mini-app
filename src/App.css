@@ -52,7 +52,6 @@ body {
   letter-spacing: -1px;
   color: #ffffff;
   line-height: 1;
-  font-family: -apple-system, system-ui, sans-serif;
 }
 
 .brand-tagline {
@@ -92,14 +91,8 @@ body {
   transition: border-color 0.15s;
 }
 
-.search-box input:focus {
-  outline: none;
-  border-color: var(--brand-orange);
-}
-
-.search-box input::placeholder {
-  color: var(--text-muted);
-}
+.search-box input:focus { outline: none; border-color: var(--brand-orange); }
+.search-box input::placeholder { color: var(--text-muted); }
 
 .search-clear {
   position: absolute;
@@ -155,10 +148,7 @@ body {
 
 .filter-btn:active { transform: scale(0.96); }
 
-.price-filter {
-  font-size: 12px;
-  padding: 7px 12px;
-}
+.price-filter { font-size: 12px; padding: 7px 12px; }
 
 /* ===== ПОЛОСА СОРТИРОВКИ ===== */
 .catalog-bar {
@@ -169,11 +159,7 @@ body {
   gap: 12px;
 }
 
-.counter {
-  font-size: 13px;
-  color: var(--text-muted);
-  flex: 1;
-}
+.counter { font-size: 13px; color: var(--text-muted); flex: 1; }
 
 .sort-btn {
   padding: 8px 14px;
@@ -211,25 +197,11 @@ body {
   overflow: hidden;
 }
 
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 149, 0, 0.15), transparent);
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
 .card:hover {
   background: var(--bg-card-hover);
   border-color: rgba(255, 149, 0, 0.25);
   transform: translateY(-1px);
 }
-
-.card:hover::before { opacity: 1; }
 
 .card:active { transform: scale(0.98); }
 
@@ -314,12 +286,14 @@ body {
   font-family: inherit;
 }
 
-.hero-photo {
-  border-radius: 16px;
+/* Фото с оверлеем */
+.detail-hero {
+  position: relative;
+  border-radius: 18px;
   overflow: hidden;
   background: #fff;
   margin-bottom: 16px;
-  position: relative;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
 }
 
 .big-photo {
@@ -329,143 +303,142 @@ body {
   object-fit: cover;
 }
 
+.detail-hero-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 40px 18px 16px;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.85) 100%);
+}
+
 .detail-title {
   font-size: 22px;
-  font-weight: 700;
-  margin: 0 0 6px;
+  font-weight: 800;
+  margin: 0;
   line-height: 1.25;
-  color: var(--text-main);
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
-.detail-specs {
-  color: var(--text-muted);
+/* Чипы характеристик */
+.specs-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.spec-chip {
+  padding: 7px 12px;
+  border-radius: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
   font-size: 13px;
-  margin: 0 0 16px;
+  color: var(--text-main);
+  font-weight: 500;
+  white-space: nowrap;
 }
 
-.detail-price-row {
+/* Блок цена + залог */
+.detail-price-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  padding: 18px 20px;
+  background: linear-gradient(135deg, rgba(255, 149, 0, 0.08) 0%, rgba(255, 107, 0, 0.03) 100%);
+  border: 1px solid rgba(255, 149, 0, 0.2);
+  border-radius: 16px;
   margin-bottom: 20px;
 }
 
+.detail-price-left { display: flex; flex-direction: column; }
+
 .price-big {
-  font-size: 26px;
-  font-weight: 800;
-  line-height: 1.1;
-  background: var(--brand-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--brand-orange);
+  letter-spacing: -1px;
 }
 
 .price-label {
   font-size: 12px;
   color: var(--text-muted);
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
-.deposit-chip {
-  padding: 8px 14px;
-  border-radius: 20px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  font-size: 13px;
+.detail-price-right {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+}
+
+.deposit-label {
+  font-size: 12px;
   color: var(--text-muted);
-  font-weight: 500;
 }
 
-label {
-  display: block;
-  margin: 14px 0 6px;
-  font-size: 13px;
-  color: var(--text-muted);
-  font-weight: 500;
+.deposit-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-top: 4px;
 }
 
-input {
-  width: 100%;
-  padding: 14px;
+/* Быстрые кнопки суток */
+.quick-days {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.quick-days::-webkit-scrollbar { display: none; }
+
+.quick-day-btn {
+  flex-shrink: 0;
+  min-width: 48px;
+  padding: 10px 0;
   border-radius: 12px;
   border: 1px solid var(--border-subtle);
-  font-size: 16px;
-  box-sizing: border-box;
   background: var(--bg-card);
   color: var(--text-main);
-  transition: border-color 0.15s;
-}
-
-input:focus {
-  outline: none;
-  border-color: var(--brand-orange);
-}
-
-button {
-  padding: 14px;
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.15s;
   font-family: inherit;
-}
-
-button.primary {
-  width: 100%;
-  background: var(--brand-gradient);
-  color: #fff;
-  font-weight: 700;
-  transition: all 0.2s;
-  box-shadow: 0 6px 20px rgba(255, 107, 0, 0.3);
-  margin-top: 8px;
-}
-
-button.primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(255, 107, 0, 0.4); }
-button.primary:active { transform: translateY(0); }
-button.primary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
-}
-
-/* ===== УСПЕХ ===== */
-.success-box {
   text-align: center;
-  padding: 60px 20px 20px;
 }
 
-.success-icon {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
+.quick-day-btn.active {
   background: var(--brand-gradient);
+  border-color: transparent;
   color: #fff;
-  font-size: 42px;
-  font-weight: 300;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 20px;
-  box-shadow: 0 10px 30px rgba(255, 107, 0, 0.4);
+  box-shadow: 0 4px 12px rgba(255, 107, 0, 0.3);
 }
 
-.success-box h1 {
-  font-size: 22px;
-  margin: 0 0 12px;
+.quick-day-btn:active { transform: scale(0.95); }
+
+.days-input {
+  margin-top: 6px;
 }
 
-/* ===== СКИДКИ ===== */
-.discount-hint {
-  background: rgba(34, 197, 94, 0.12);
+/* Скидка */
+.discount-badge {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.05));
   color: #4ade80;
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  padding: 12px 14px;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  padding: 12px 16px;
   border-radius: 12px;
   margin: 12px 0;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
+  text-align: center;
 }
 
 .discount-hint-muted {
@@ -476,8 +449,10 @@ button.primary:disabled {
   margin: 12px 0;
   font-size: 14px;
   border: 1px solid var(--border-subtle);
+  text-align: center;
 }
 
+/* Расчёт цены */
 .price-breakdown {
   margin: 18px 0;
   padding: 16px;
@@ -507,6 +482,135 @@ button.primary:disabled {
   border-top: 1px solid var(--border-subtle);
 }
 
+.price-breakdown .row.total-row span:last-child {
+  color: var(--brand-orange);
+}
+
+label {
+  display: block;
+  margin: 14px 0 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+input {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  font-size: 16px;
+  box-sizing: border-box;
+  background: var(--bg-card);
+  color: var(--text-main);
+  transition: border-color 0.15s;
+}
+
+input:focus { outline: none; border-color: var(--brand-orange); }
+
+button {
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+button.primary {
+  width: 100%;
+  background: var(--brand-gradient);
+  color: #fff;
+  font-weight: 700;
+  transition: all 0.2s;
+  box-shadow: 0 6px 20px rgba(255, 107, 0, 0.3);
+  margin-top: 8px;
+}
+
+button.primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(255, 107, 0, 0.4); }
+button.primary:active { transform: translateY(0); }
+button.primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Кнопки контактов */
+.contact-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.contact-btn {
+  flex: 1;
+  padding: 13px;
+  border-radius: 12px;
+  text-align: center;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 600;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-main);
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.contact-btn-phone:active,
+.contact-btn-tg:active { transform: scale(0.97); }
+
+.contact-btn-phone:hover {
+  border-color: var(--brand-orange);
+  color: var(--brand-orange);
+}
+
+.contact-btn-tg:hover {
+  border-color: #2ea6ff;
+  color: #2ea6ff;
+}
+
+/* Похожие машины */
+.similar-section {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.similar-title {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 14px;
+  color: var(--text-main);
+}
+
+/* ===== УСПЕХ ===== */
+.success-box {
+  text-align: center;
+  padding: 60px 20px 20px;
+}
+
+.success-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--brand-gradient);
+  color: #fff;
+  font-size: 42px;
+  font-weight: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  box-shadow: 0 10px 30px rgba(255, 107, 0, 0.4);
+}
+
+.success-box h1 { font-size: 22px; margin: 0 0 12px; }
+
 .error-msg {
   background: rgba(239, 68, 68, 0.12);
   color: #f87171;
@@ -518,10 +622,7 @@ button.primary:disabled {
 }
 
 /* ===== ПУСТО ===== */
-.empty-box {
-  text-align: center;
-  padding: 60px 20px;
-}
+.empty-box { text-align: center; padding: 60px 20px; }
 
 .empty-icon {
   font-size: 48px;
@@ -536,8 +637,4 @@ button.primary:disabled {
   margin: 0 0 6px;
 }
 
-.empty-hint {
-  color: var(--text-muted);
-  font-size: 13px;
-  margin: 0;
-}
+.empty-hint { color: var(--text-muted); font-size: 13px; margin: 0; }

@@ -21,6 +21,13 @@ const PRICE_RANGES = [
   { label: 'от 10 000 ₽', min: 10000, max: Infinity },
 ];
 
+// ⏱️ Быстрые варианты срока аренды
+const QUICK_DAYS = [1, 3, 5, 7, 10, 14, 30];
+
+// 📞 Номер телефона менеджера
+const MANAGER_PHONE = '+79990000000'; // ← замените на свой
+const MANAGER_TG = 'blackrent_spb';   // ← username менеджера без @
+
 function getDiscountPercent(days: number): number {
   for (const d of DISCOUNTS) {
     if (days >= d.minDays) return d.percent;
@@ -67,7 +74,6 @@ function isPhoneComplete(phone: string): boolean {
   return phone.replace(/\D/g, '').length === 11;
 }
 
-// 🔤 Нормализация названия кузова (приводим к единому виду)
 function normalizeBody(body: string): string {
   const map: Record<string, string> = {
     'suv': 'Внедорожник',
@@ -122,27 +128,19 @@ export default function App() {
 
   const filteredCars = useMemo(() => {
     let result = cars.slice();
-
     if (bodyFilter !== 'Все') {
       result = result.filter(c => normalizeBody((c as any).body) === bodyFilter);
     }
-
     const range = PRICE_RANGES[priceRange];
     result = result.filter(c => c.price >= range.min && c.price < range.max);
-
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       result = result.filter(c =>
         `${c.brand} ${c.model}`.toLowerCase().includes(q)
       );
     }
-
-    if (sortOrder === 'asc') {
-      result.sort((a, b) => a.price - b.price);
-    } else if (sortOrder === 'desc') {
-      result.sort((a, b) => b.price - a.price);
-    }
-
+    if (sortOrder === 'asc') result.sort((a, b) => a.price - b.price);
+    else if (sortOrder === 'desc') result.sort((a, b) => b.price - a.price);
     return result;
   }, [bodyFilter, priceRange, sortOrder, search]);
 
@@ -151,6 +149,15 @@ export default function App() {
     : { base: 0, percent: 0, discount: 0, total: 0 };
 
   const phoneReady = isPhoneComplete(phone);
+
+  // Похожие машины — та же категория, кроме текущей, максимум 4
+  const similarCars = useMemo(() => {
+    if (!selectedCar) return [];
+    return cars
+      .filter(c => c.id !== selectedCar.id)
+      .filter(c => normalizeBody((c as any).body) === normalizeBody((selectedCar as any).body))
+      .slice(0, 4);
+  }, [selectedCar]);
 
   async function submit() {
     if (!selectedCar || !phoneReady) return;
@@ -183,7 +190,7 @@ export default function App() {
       WebApp.HapticFeedback?.notificationOccurred('success');
     } catch (e) {
       console.error(e);
-      setError('Не удалось отправить заявку. Позвоните нам: +7 (999) 000-00-00');
+      setError('Не удалось отправить заявку. Позвоните нам.');
     } finally {
       setSending(false);
     }
@@ -209,61 +216,99 @@ export default function App() {
       <div className="wrap">
         <button className="back" onClick={() => setSelectedCar(null)}>← Назад</button>
 
-        <div className="hero-photo">
+        {/* Фото с названием на нём */}
+        <div className="detail-hero">
           <img src={selectedCar.photo} alt="" className="big-photo" />
+          <div className="detail-hero-overlay">
+            <h1 className="detail-title">
+              {selectedCar.brand} {selectedCar.model}
+              {selectedCar.year > 0 ? `, ${selectedCar.year}` : ''}
+            </h1>
+          </div>
         </div>
 
-        <h1 className="detail-title">
-          {selectedCar.brand} {selectedCar.model}
-          {selectedCar.year > 0 ? `, ${selectedCar.year}` : ''}
-        </h1>
+        {/* Чипы характеристик */}
+        <div className="specs-chips">
+          {selectedCar.transmission && (
+            <span className="spec-chip">⚙️ {selectedCar.transmission}</span>
+          )}
+          {selectedCar.fuel && (
+            <span className="spec-chip">⛽ {selectedCar.fuel}</span>
+          )}
+          {selectedCar.body && (
+            <span className="spec-chip">🚗 {normalizeBody(selectedCar.body)}</span>
+          )}
+          {selectedCar.color && (
+            <span className="spec-chip">🎨 {selectedCar.color}</span>
+          )}
+        </div>
 
-        <p className="detail-specs">
-          {selectedCar.transmission} · {selectedCar.fuel}
-          {selectedCar.color ? ` · ${selectedCar.color}` : ''}
-          {selectedCar.body ? ` · ${normalizeBody(selectedCar.body)}` : ''}
-        </p>
-
-        <div className="detail-price-row">
-          <div>
+        {/* Блок цена + залог */}
+        <div className="detail-price-card">
+          <div className="detail-price-left">
             <div className="price-big">{selectedCar.price} ₽</div>
             <div className="price-label">за сутки</div>
           </div>
-          <div className="deposit-chip">
-            Залог {selectedCar.deposit} ₽
+          <div className="detail-price-right">
+            <div className="deposit-label">Залог</div>
+            <div className="deposit-value">{selectedCar.deposit} ₽</div>
           </div>
         </div>
 
+        {/* Быстрые кнопки выбора суток */}
         <label>Сколько суток?</label>
-        <input type="number" min={1} value={days}
-               onChange={e => setDays(Math.max(1, Number(e.target.value)))} />
+        <div className="quick-days">
+          {QUICK_DAYS.map(d => (
+            <button
+              key={d}
+              className={`quick-day-btn ${days === d ? 'active' : ''}`}
+              onClick={() => setDays(d)}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
 
+        {/* Ручной ввод суток */}
+        <input
+          type="number"
+          min={1}
+          value={days}
+          onChange={e => setDays(Math.max(1, Number(e.target.value)))}
+          className="days-input"
+        />
+
+        {/* Скидка */}
         {price.percent > 0 && (
-          <p className="discount-hint">
-            🎉 Скидка {price.percent}% при аренде от {DISCOUNTS.find(d => d.percent === price.percent)?.minDays} суток
-          </p>
+          <div className="discount-badge">
+            🎉 Скидка {price.percent}% применена
+          </div>
         )}
         {price.percent === 0 && days < 5 && (
-          <p className="discount-hint-muted">От 5 суток — скидка 10%</p>
+          <p className="discount-hint-muted">
+            От 5 суток — скидка 10%
+          </p>
         )}
 
+        {/* Расчёт цены */}
         <div className="price-breakdown">
           <div className="row">
-            <span>Стоимость за {days} сут.</span>
-            <span>{price.base} ₽</span>
+            <span>Стоимость за {days} {plural(days, 'сутки', 'суток', 'суток')}</span>
+            <span>{price.base.toLocaleString('ru-RU')} ₽</span>
           </div>
           {price.discount > 0 && (
             <div className="row discount">
               <span>Скидка {price.percent}%</span>
-              <span>−{price.discount} ₽</span>
+              <span>−{price.discount.toLocaleString('ru-RU')} ₽</span>
             </div>
           )}
           <div className="row total-row">
             <span>Итого</span>
-            <span>{price.total} ₽</span>
+            <span>{price.total.toLocaleString('ru-RU')} ₽</span>
           </div>
         </div>
 
+        {/* Форма */}
         <label>Ваше имя</label>
         <input value={name} onChange={e => setName(e.target.value)} />
 
@@ -276,9 +321,56 @@ export default function App() {
         />
 
         {error && <p className="error-msg">{error}</p>}
+
         <button className="primary" onClick={submit} disabled={!phoneReady || sending}>
           {sending ? 'Отправляем...' : 'Отправить заявку'}
         </button>
+
+        {/* Кнопки быстрой связи */}
+        <div className="contact-buttons">
+          <a
+            href={`tel:${MANAGER_PHONE}`}
+            className="contact-btn contact-btn-phone"
+          >
+            📞 Позвонить
+          </a>
+          <a
+            href={`https://t.me/${MANAGER_TG}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="contact-btn contact-btn-tg"
+          >
+            💬 Написать
+          </a>
+        </div>
+
+        {/* Похожие машины */}
+        {similarCars.length > 0 && (
+          <div className="similar-section">
+            <h2 className="similar-title">Похожие авто</h2>
+            {similarCars.map(car => (
+              <div
+                key={car.id}
+                className="card"
+                onClick={() => {
+                  setSelectedCar(car);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              >
+                <div className="card-photo">
+                  <img src={car.photo} alt="" />
+                </div>
+                <div className="info">
+                  <b>{car.brand} {car.model}</b>
+                  <span className="car-sub">
+                    {car.year > 0 ? `${car.year} · ` : ''}{car.transmission}
+                  </span>
+                  <span className="price">{car.price} ₽<span className="price-unit">/сутки</span></span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
