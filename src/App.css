@@ -5,6 +5,7 @@ body {
   font-family: -apple-system, system-ui, sans-serif;
   background: var(--tg-theme-bg-color, #fff);
   color: var(--tg-theme-text-color, #000);
+  overflow-x: hidden; /* ← НОВОЕ: не даём странице уезжать вправо */
 }
 
 .wrap { padding: 16px; max-width: 500px; margin: 0 auto; }
@@ -175,23 +176,28 @@ button.back {
   margin: 12px 0;
   font-size: 14px;
 }
-/* ===== ФИЛЬТРЫ ПО КУЗОВУ ===== */
+
+/* ===== ФИЛЬТРЫ ПО КУЗОВУ (горизонтальный скролл) ===== */
+.filters-wrap {
+  margin: 0 -16px 8px -16px;   /* растягиваем на всю ширину экрана */
+  overflow: hidden;             /* ← ключевое: обрезаем всё, что выходит */
+}
+
 .filters {
   display: flex;
   gap: 8px;
-  overflow-x: auto;
-  padding: 4px 0 12px 0;
-  margin: 0 -16px 8px -16px;
-  padding-left: 16px;
-  padding-right: 16px;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
+  overflow-x: auto;             /* прокрутка пальцем влево-вправо */
+  overflow-y: hidden;
+  padding: 4px 16px 12px 16px;  /* по бокам 16px — не липнет к краям */
+  scrollbar-width: none;        /* прячем скроллбар (Firefox) */
+  -webkit-overflow-scrolling: touch; /* плавный скролл на iOS */
+  touch-action: pan-x;          /* явно разрешаем горизонтальный жест */
 }
 
 .filters::-webkit-scrollbar { display: none; }
 
 .filter-btn {
-  flex-shrink: 0;
+  flex-shrink: 0;               /* ← кнопки не сжимаются */
   padding: 8px 14px;
   border-radius: 20px;
   border: 1px solid #ddd;
@@ -200,7 +206,7 @@ button.back {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  white-space: nowrap;
+  white-space: nowrap;          /* текст не переносится */
   transition: all 0.15s;
 }
 

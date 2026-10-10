@@ -92,8 +92,7 @@ export default function App() {
       const b = (c as any).body || 'Прочее';
       counts[b] = (counts[b] || 0) + 1;
     });
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1]);
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, []);
 
   // Отфильтрованные машины
@@ -233,23 +232,25 @@ export default function App() {
         {filteredCars.length} из {cars.length} машин · скидки до 20%
       </p>
 
-      {/* ФИЛЬТРЫ ПО КУЗОВУ */}
-      <div className="filters">
-        <button
-          className={`filter-btn ${bodyFilter === 'Все' ? 'active' : ''}`}
-          onClick={() => setBodyFilter('Все')}
-        >
-          Все ({cars.length})
-        </button>
-        {categories.map(([name, count]) => (
+      {/* ФИЛЬТРЫ ПО КУЗОВУ — обёрнуты в filters-wrap для горизонтального скролла */}
+      <div className="filters-wrap">
+        <div className="filters">
           <button
-            key={name}
-            className={`filter-btn ${bodyFilter === name ? 'active' : ''}`}
-            onClick={() => setBodyFilter(name)}
+            className={`filter-btn ${bodyFilter === 'Все' ? 'active' : ''}`}
+            onClick={() => setBodyFilter('Все')}
           >
-            {name} ({count})
+            Все ({cars.length})
           </button>
-        ))}
+          {categories.map(([name, count]) => (
+            <button
+              key={name}
+              className={`filter-btn ${bodyFilter === name ? 'active' : ''}`}
+              onClick={() => setBodyFilter(name)}
+            >
+              {name} ({count})
+            </button>
+          ))}
+        </div>
       </div>
 
       {filteredCars.length === 0 && (
