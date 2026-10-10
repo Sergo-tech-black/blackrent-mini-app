@@ -28,8 +28,6 @@ function calcPrice(pricePerDay: number, days: number) {
 }
 
 // 🔍 Надёжно достаём данные пользователя из Telegram.
-// Пробуем сначала window.Telegram.WebApp (там всегда актуально),
-// если не вышло — fallback на @twa-dev/sdk.
 function getTgUser(): any {
   try {
     const tg: any = (window as any).Telegram?.WebApp;
@@ -51,6 +49,7 @@ export default function App() {
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [debug, setDebug] = useState('');
 
   useEffect(() => {
     try {
@@ -62,8 +61,22 @@ export default function App() {
       if (u?.first_name) {
         setName(u.first_name);
       }
+
+      // 🐞 Отладка: собираем всё, что видит приложение
+      const initData: string =
+        (window as any).Telegram?.WebApp?.initData ||
+        (WebApp as any)?.initData || '';
+      const info = [
+        `platform: ${(window as any).Telegram?.WebApp?.platform ?? '—'}`,
+        `version: ${(window as any).Telegram?.WebApp?.version ?? '—'}`,
+        `initData length: ${initData.length}`,
+        `user: ${u ? JSON.stringify(u) : 'null'}`,
+      ].join('\n');
+      setDebug(info);
+      console.log('DEBUG Telegram:', info);
     } catch (e) {
       console.log('Telegram WebApp недоступен — работаем в браузере', e);
+      setDebug('Ошибка: ' + String(e));
     }
   }, []);
 
@@ -183,6 +196,21 @@ export default function App() {
         <button className="primary" onClick={submit} disabled={!phone || sending}>
           {sending ? 'Отправляем...' : 'Отправить заявку'}
         </button>
+
+        {/* 🐞 Отладочный блок — потом удалим */}
+        <pre style={{
+          fontSize: 10,
+          color: '#888',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-all',
+          marginTop: 16,
+          padding: 8,
+          background: '#f0f0f0',
+          borderRadius: 6,
+          lineHeight: 1.4,
+        }}>
+{debug}
+        </pre>
       </div>
     );
   }
