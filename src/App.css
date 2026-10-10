@@ -638,3 +638,53 @@ button.primary:disabled {
 }
 
 .empty-hint { color: var(--text-muted); font-size: 13px; margin: 0; }
+/* ===== СТАТУСЫ АВТО ===== */
+.card-unavailable {
+  opacity: 0.65;
+}
+
+.card-unavailable .card-photo img {
+  filter: grayscale(0.4);
+}
+
+.status-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #fff;
+  backdrop-filter: blur(8px);
+  z-index: 2;
+}
+
+.status-badge-inline {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #fff;
+  margin-bottom: 8px;
+  backdrop-filter: blur(8px);
+}
+
+.status-busy {
+  background: rgba(239, 68, 68, 0.9);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+}
+
+.status-service {
+  background: rgba(120, 120, 120, 0.9);
+  box-shadow: 0 2px 8px rgba(120, 120, 120, 0.3);
+}
+
+.card-photo {
+  position: relative;
+}

@@ -4,6 +4,7 @@ import cars from './cars.json';
 import './App.css';
 
 type Car = typeof cars[0];
+type CarStatus = 'available' | 'busy' | 'service';
 
 // ⚙️ Настройки скидок
 const DISCOUNTS = [
@@ -24,9 +25,9 @@ const PRICE_RANGES = [
 // ⏱️ Быстрые варианты срока аренды
 const QUICK_DAYS = [1, 3, 5, 7, 10, 14, 30];
 
-// 📞 Номер телефона менеджера
-const MANAGER_PHONE = '+79990000000'; // ← замените на свой
-const MANAGER_TG = 'blackrent_spb';   // ← username менеджера без @
+// 📞 Контакты менеджера
+const MANAGER_PHONE = '+79990000000';
+const MANAGER_TG = 'blackrent_spb';
 
 function getDiscountPercent(days: number): number {
   for (const d of DISCOUNTS) {
@@ -91,6 +92,39 @@ function normalizeBody(body: string): string {
   return map[key] || body || 'Прочее';
 }
 
+// 🚦 Получить статус машины
+function getStatus(car: any): CarStatus {
+  const s = (car?.status || 'available') as CarStatus;
+  if (s === 'busy' || s === 'service') return s;
+  return 'available';
+}
+
+// 📅 Форматировать дату до которой занята
+function formatBusyUntil(dateStr?: string): string {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}.${mm}.${d.getFullYear()}`;
+  } catch {
+    return '';
+  }
+}
+
+// 🏷️ Текст и цвет бейджа
+function statusInfo(car: any): { text: string; className: string } | null {
+  const s = getStatus(car);
+  if (s === 'available') return null;
+  if (s === 'service') return { text: 'На обслуживании', className: 'status-service' };
+  const until = formatBusyUntil(car?.busyUntil);
+  return {
+    text: until ? `Занята до ${until}` : 'Занята',
+    className: 'status-busy',
+  };
+}
+
 export default function App() {
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [days, setDays] = useState(1);
@@ -103,6 +137,7 @@ export default function App() {
   const [priceRange, setPriceRange] = useState(0);
   const [sortOrder, setSortOrder] = useState<'none' | 'asc' | 'desc'>('none');
   const [search, setSearch] = useState('');
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
 
   useEffect(() => {
     try {
@@ -128,21 +163,30 @@ export default function App() {
 
   const filteredCars = useMemo(() => {
     let result = cars.slice();
+
     if (bodyFilter !== 'Все') {
       result = result.filter(c => normalizeBody((c as any).body) === bodyFilter);
     }
+
     const range = PRICE_RANGES[priceRange];
     result = result.filter(c => c.price >= range.min && c.price < range.max);
+
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       result = result.filter(c =>
         `${c.brand} ${c.model}`.toLowerCase().includes(q)
       );
     }
+
+    if (onlyAvailable) {
+      result = result.filter(c => getStatus(c) === 'available');
+    }
+
     if (sortOrder === 'asc') result.sort((a, b) => a.price - b.price);
     else if (sortOrder === 'desc') result.sort((a, b) => b.price - a.price);
+
     return result;
-  }, [bodyFilter, priceRange, sortOrder, search]);
+  }, [bodyFilter, priceRange, sortOrder, search, onlyAvailable]);
 
   const price = selectedCar
     ? calcPrice(selectedCar.price, days)
@@ -150,7 +194,6 @@ export default function App() {
 
   const phoneReady = isPhoneComplete(phone);
 
-  // Похожие машины — та же категория, кроме текущей, максимум 4
   const similarCars = useMemo(() => {
     if (!selectedCar) return [];
     return cars
@@ -212,14 +255,19 @@ export default function App() {
   }
 
   if (selectedCar) {
+    const status = statusInfo(selectedCar);
     return (
       <div className="wrap">
         <button className="back" onClick={() => setSelectedCar(null)}>← Назад</button>
 
-        {/* Фото с названием на нём */}
         <div className="detail-hero">
           <img src={selectedCar.photo} alt="" className="big-photo" />
           <div className="detail-hero-overlay">
+            {status && (
+              <span className={`status-badge-inline ${status.className}`}>
+                {status.text}
+              </span>
+            )}
             <h1 className="detail-title">
               {selectedCar.brand} {selectedCar.model}
               {selectedCar.year > 0 ? `, ${selectedCar.year}` : ''}
@@ -227,7 +275,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Чипы характеристик */}
         <div className="specs-chips">
           {selectedCar.transmission && (
             <span className="spec-chip">⚙️ {selectedCar.transmission}</span>
@@ -243,7 +290,6 @@ export default function App() {
           )}
         </div>
 
-        {/* Блок цена + залог */}
         <div className="detail-price-card">
           <div className="detail-price-left">
             <div className="price-big">{selectedCar.price} ₽</div>
@@ -255,7 +301,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Быстрые кнопки выбора суток */}
         <label>Сколько суток?</label>
         <div className="quick-days">
           {QUICK_DAYS.map(d => (
@@ -269,7 +314,6 @@ export default function App() {
           ))}
         </div>
 
-        {/* Ручной ввод суток */}
         <input
           type="number"
           min={1}
@@ -278,7 +322,6 @@ export default function App() {
           className="days-input"
         />
 
-        {/* Скидка */}
         {price.percent > 0 && (
           <div className="discount-badge">
             🎉 Скидка {price.percent}% применена
@@ -290,7 +333,6 @@ export default function App() {
           </p>
         )}
 
-        {/* Расчёт цены */}
         <div className="price-breakdown">
           <div className="row">
             <span>Стоимость за {days} {plural(days, 'сутки', 'суток', 'суток')}</span>
@@ -308,7 +350,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Форма */}
         <label>Ваше имя</label>
         <input value={name} onChange={e => setName(e.target.value)} />
 
@@ -326,12 +367,8 @@ export default function App() {
           {sending ? 'Отправляем...' : 'Отправить заявку'}
         </button>
 
-        {/* Кнопки быстрой связи */}
         <div className="contact-buttons">
-          <a
-            href={`tel:${MANAGER_PHONE}`}
-            className="contact-btn contact-btn-phone"
-          >
+          <a href={`tel:${MANAGER_PHONE}`} className="contact-btn contact-btn-phone">
             📞 Позвонить
           </a>
           <a
@@ -344,31 +381,38 @@ export default function App() {
           </a>
         </div>
 
-        {/* Похожие машины */}
         {similarCars.length > 0 && (
           <div className="similar-section">
             <h2 className="similar-title">Похожие авто</h2>
-            {similarCars.map(car => (
-              <div
-                key={car.id}
-                className="card"
-                onClick={() => {
-                  setSelectedCar(car);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              >
-                <div className="card-photo">
-                  <img src={car.photo} alt="" />
+            {similarCars.map(car => {
+              const s = statusInfo(car);
+              return (
+                <div
+                  key={car.id}
+                  className="card"
+                  onClick={() => {
+                    setSelectedCar(car);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                >
+                  <div className="card-photo">
+                    <img src={car.photo} alt="" />
+                    {s && (
+                      <span className={`status-badge ${s.className}`}>
+                        {getStatus(car) === 'service' ? 'ТО' : 'Занята'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="info">
+                    <b>{car.brand} {car.model}</b>
+                    <span className="car-sub">
+                      {car.year > 0 ? `${car.year} · ` : ''}{car.transmission}
+                    </span>
+                    <span className="price">{car.price} ₽<span className="price-unit">/сутки</span></span>
+                  </div>
                 </div>
-                <div className="info">
-                  <b>{car.brand} {car.model}</b>
-                  <span className="car-sub">
-                    {car.year > 0 ? `${car.year} · ` : ''}{car.transmission}
-                  </span>
-                  <span className="price">{car.price} ₽<span className="price-unit">/сутки</span></span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -430,6 +474,13 @@ export default function App() {
           {filteredCars.length} {plural(filteredCars.length, 'машина', 'машины', 'машин')}
         </span>
         <button
+          className={`sort-btn ${onlyAvailable ? 'active' : ''}`}
+          onClick={() => setOnlyAvailable(v => !v)}
+          style={{ marginRight: 8 }}
+        >
+          {onlyAvailable ? '✓ Свободные' : 'Только свободные'}
+        </button>
+        <button
           className={`sort-btn ${sortOrder !== 'none' ? 'active' : ''}`}
           onClick={() => {
             setSortOrder(sortOrder === 'none' ? 'asc' : sortOrder === 'asc' ? 'desc' : 'none');
@@ -449,26 +500,38 @@ export default function App() {
         </div>
       )}
 
-      {filteredCars.map(car => (
-        <div key={car.id} className="card" onClick={() => setSelectedCar(car)}>
-          <div className="card-photo">
-            <img src={car.photo} alt="" />
+      {filteredCars.map(car => {
+        const s = statusInfo(car);
+        const isUnavailable = getStatus(car) !== 'available';
+        return (
+          <div
+            key={car.id}
+            className={`card ${isUnavailable ? 'card-unavailable' : ''}`}
+            onClick={() => setSelectedCar(car)}
+          >
+            <div className="card-photo">
+              <img src={car.photo} alt="" />
+              {s && (
+                <span className={`status-badge ${s.className}`}>
+                  {getStatus(car) === 'service' ? 'ТО' : 'Занята'}
+                </span>
+              )}
+            </div>
+            <div className="info">
+              <b>{car.brand} {car.model}</b>
+              <span className="car-sub">
+                {car.year > 0 ? `${car.year} · ` : ''}{car.transmission}
+                {car.body ? ` · ${normalizeBody(car.body)}` : ''}
+              </span>
+              <span className="price">{car.price} ₽<span className="price-unit">/сутки</span></span>
+            </div>
           </div>
-          <div className="info">
-            <b>{car.brand} {car.model}</b>
-            <span className="car-sub">
-              {car.year > 0 ? `${car.year} · ` : ''}{car.transmission}
-              {car.body ? ` · ${normalizeBody(car.body)}` : ''}
-            </span>
-            <span className="price">{car.price} ₽<span className="price-unit">/сутки</span></span>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
-// Склонение слов
 function plural(n: number, one: string, few: string, many: string): string {
   const mod10 = n % 10;
   const mod100 = n % 100;
