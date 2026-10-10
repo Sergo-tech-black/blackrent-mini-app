@@ -175,3 +175,47 @@ button.back {
   margin: 12px 0;
   font-size: 14px;
 }
+/* ===== ФИЛЬТРЫ ПО КУЗОВУ ===== */
+.filters {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 12px 0;
+  margin: 0 -16px 8px -16px;
+  padding-left: 16px;
+  padding-right: 16px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.filters::-webkit-scrollbar { display: none; }
+
+.filter-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1px solid #ddd;
+  background: var(--tg-theme-bg-color, #fff);
+  color: var(--tg-theme-text-color, #000);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.filter-btn.active {
+  background: #2ea6ff;
+  color: #fff;
+  border-color: #2ea6ff;
+  font-weight: 600;
+}
+
+.filter-btn:active { transform: scale(0.96); }
+
+.empty {
+  text-align: center;
+  color: #888;
+  padding: 40px 20px;
+  font-size: 15px;
+}

@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import WebApp from '@twa-dev/sdk';
 import cars from './cars.json';
 import './App.css';
 
 type Car = typeof cars[0];
 
-// ⚙️ Настройки скидок. Меняйте цифры под себя.
+// ⚙️ Настройки скидок
 const DISCOUNTS = [
   { minDays: 20, percent: 20 },
   { minDays: 10, percent: 15 },
@@ -27,7 +27,7 @@ function calcPrice(pricePerDay: number, days: number) {
   return { base, percent, discount, total };
 }
 
-// 🔍 Надёжно достаём данные пользователя из Telegram.
+// 🔍 Достаём данные пользователя из Telegram
 function getTgUser(): any {
   try {
     const tg: any = (window as any).Telegram?.WebApp;
@@ -41,6 +41,27 @@ function getTgUser(): any {
   return null;
 }
 
+// 📞 Маска телефона: +7 (XXX) XXX-XX-XX
+function formatPhone(value: string): string {
+  let digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits[0] === '8') digits = '7' + digits.slice(1);
+  if (digits[0] !== '7') digits = '7' + digits;
+  digits = digits.slice(0, 11);
+
+  let r = '+7';
+  if (digits.length > 1) r += ' (' + digits.slice(1, 4);
+  if (digits.length >= 5) r += ') ' + digits.slice(4, 7);
+  if (digits.length >= 8) r += '-' + digits.slice(7, 9);
+  if (digits.length >= 10) r += '-' + digits.slice(9, 11);
+  return r;
+}
+
+// ✅ Проверка, что номер заполнен полностью
+function isPhoneComplete(phone: string): boolean {
+  return phone.replace(/\D/g, '').length === 11;
+}
+
 export default function App() {
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [days, setDays] = useState(1);
@@ -49,6 +70,7 @@ export default function App() {
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [bodyFilter, setBodyFilter] = useState('Все');
 
   useEffect(() => {
     try {
@@ -57,20 +79,37 @@ export default function App() {
       WebApp?.ready?.();
       WebApp?.expand?.();
       const u = getTgUser();
-      if (u?.first_name) {
-        setName(u.first_name);
-      }
+      if (u?.first_name) setName(u.first_name);
     } catch (e) {
-      console.log('Telegram WebApp недоступен — работаем в браузере', e);
+      console.log('Telegram WebApp недоступен', e);
     }
   }, []);
+
+  // Считаем категории (по полю body) и количество в каждой
+  const categories = useMemo(() => {
+    const counts: Record<string, number> = {};
+    cars.forEach(c => {
+      const b = (c as any).body || 'Прочее';
+      counts[b] = (counts[b] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1]);
+  }, []);
+
+  // Отфильтрованные машины
+  const filteredCars = useMemo(() => {
+    if (bodyFilter === 'Все') return cars;
+    return cars.filter(c => ((c as any).body || 'Прочее') === bodyFilter);
+  }, [bodyFilter]);
 
   const price = selectedCar
     ? calcPrice(selectedCar.price, days)
     : { base: 0, percent: 0, discount: 0, total: 0 };
 
+  const phoneReady = isPhoneComplete(phone);
+
   async function submit() {
-    if (!selectedCar || !phone) return;
+    if (!selectedCar || !phoneReady) return;
     setSending(true);
     setError('');
 
@@ -148,9 +187,7 @@ export default function App() {
           </p>
         )}
         {price.percent === 0 && days < 5 && (
-          <p className="discount-hint-muted">
-            От 5 суток — скидка 10%
-          </p>
+          <p className="discount-hint-muted">От 5 суток — скидка 10%</p>
         )}
 
         <div className="price-breakdown">
@@ -174,11 +211,15 @@ export default function App() {
         <input value={name} onChange={e => setName(e.target.value)} />
 
         <label>Телефон *</label>
-        <input value={phone} placeholder="+7..." 
-               onChange={e => setPhone(e.target.value)} />
+        <input
+          value={phone}
+          placeholder="+7 (___) ___-__-__"
+          inputMode="tel"
+          onChange={e => setPhone(formatPhone(e.target.value))}
+        />
 
         {error && <p className="error-msg">{error}</p>}
-        <button className="primary" onClick={submit} disabled={!phone || sending}>
+        <button className="primary" onClick={submit} disabled={!phoneReady || sending}>
           {sending ? 'Отправляем...' : 'Отправить заявку'}
         </button>
       </div>
@@ -188,8 +229,34 @@ export default function App() {
   return (
     <div className="wrap">
       <h1>Аренда авто в СПб</h1>
-      <p className="sub">{cars.length} машин в наличии · скидки до 20%</p>
-      {cars.map(car => (
+      <p className="sub">
+        {filteredCars.length} из {cars.length} машин · скидки до 20%
+      </p>
+
+      {/* ФИЛЬТРЫ ПО КУЗОВУ */}
+      <div className="filters">
+        <button
+          className={`filter-btn ${bodyFilter === 'Все' ? 'active' : ''}`}
+          onClick={() => setBodyFilter('Все')}
+        >
+          Все ({cars.length})
+        </button>
+        {categories.map(([name, count]) => (
+          <button
+            key={name}
+            className={`filter-btn ${bodyFilter === name ? 'active' : ''}`}
+            onClick={() => setBodyFilter(name)}
+          >
+            {name} ({count})
+          </button>
+        ))}
+      </div>
+
+      {filteredCars.length === 0 && (
+        <p className="empty">В этой категории пока нет машин</p>
+      )}
+
+      {filteredCars.map(car => (
         <div key={car.id} className="card" onClick={() => setSelectedCar(car)}>
           <img src={car.photo} alt="" />
           <div className="info">
