@@ -232,25 +232,22 @@ export default function App() {
         {filteredCars.length} из {cars.length} машин · скидки до 20%
       </p>
 
-      {/* ФИЛЬТРЫ ПО КУЗОВУ — обёрнуты в filters-wrap для горизонтального скролла */}
-      <div className="filters-wrap">
-        <div className="filters">
+      <div className="filters">
+        <button
+          className={`filter-btn ${bodyFilter === 'Все' ? 'active' : ''}`}
+          onClick={() => setBodyFilter('Все')}
+        >
+          Все ({cars.length})
+        </button>
+        {categories.map(([name, count]) => (
           <button
-            className={`filter-btn ${bodyFilter === 'Все' ? 'active' : ''}`}
-            onClick={() => setBodyFilter('Все')}
+            key={name}
+            className={`filter-btn ${bodyFilter === name ? 'active' : ''}`}
+            onClick={() => setBodyFilter(name)}
           >
-            Все ({cars.length})
+            {name} ({count})
           </button>
-          {categories.map(([name, count]) => (
-            <button
-              key={name}
-              className={`filter-btn ${bodyFilter === name ? 'active' : ''}`}
-              onClick={() => setBodyFilter(name)}
-            >
-              {name} ({count})
-            </button>
-          ))}
-        </div>
+        ))}
       </div>
 
       {filteredCars.length === 0 && (
