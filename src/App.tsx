@@ -12,6 +12,15 @@ const DISCOUNTS = [
   { minDays: 5,  percent: 10 },
 ];
 
+// 💰 Ценовые диапазоны
+const PRICE_RANGES = [
+  { label: 'Все цены', min: 0, max: Infinity },
+  { label: 'до 3 000 ₽', min: 0, max: 3000 },
+  { label: '3 000 – 5 000 ₽', min: 3000, max: 5000 },
+  { label: '5 000 – 10 000 ₽', min: 5000, max: 10000 },
+  { label: 'от 10 000 ₽', min: 10000, max: Infinity },
+];
+
 function getDiscountPercent(days: number): number {
   for (const d of DISCOUNTS) {
     if (days >= d.minDays) return d.percent;
@@ -27,7 +36,6 @@ function calcPrice(pricePerDay: number, days: number) {
   return { base, percent, discount, total };
 }
 
-// 🔍 Достаём данные пользователя из Telegram
 function getTgUser(): any {
   try {
     const tg: any = (window as any).Telegram?.WebApp;
@@ -41,14 +49,12 @@ function getTgUser(): any {
   return null;
 }
 
-// 📞 Маска телефона: +7 (XXX) XXX-XX-XX
 function formatPhone(value: string): string {
   let digits = value.replace(/\D/g, '');
   if (!digits) return '';
   if (digits[0] === '8') digits = '7' + digits.slice(1);
   if (digits[0] !== '7') digits = '7' + digits;
   digits = digits.slice(0, 11);
-
   let r = '+7';
   if (digits.length > 1) r += ' (' + digits.slice(1, 4);
   if (digits.length >= 5) r += ') ' + digits.slice(4, 7);
@@ -57,9 +63,26 @@ function formatPhone(value: string): string {
   return r;
 }
 
-// ✅ Проверка, что номер заполнен полностью
 function isPhoneComplete(phone: string): boolean {
   return phone.replace(/\D/g, '').length === 11;
+}
+
+// 🔤 Нормализация названия кузова (приводим к единому виду)
+function normalizeBody(body: string): string {
+  const map: Record<string, string> = {
+    'suv': 'Внедорожник',
+    'джип': 'Внедорожник',
+    'внедорожник': 'Внедорожник',
+    'кроссовер': 'Кроссовер',
+    'седан': 'Седан',
+    'минивен': 'Минивен',
+    'минивэн': 'Минивен',
+    'купе': 'Купе',
+    'кабриолет': 'Кабриолет',
+    'хэтчбек': 'Хэтчбек',
+  };
+  const key = (body || '').toLowerCase().trim();
+  return map[key] || body || 'Прочее';
 }
 
 export default function App() {
@@ -71,6 +94,9 @@ export default function App() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [bodyFilter, setBodyFilter] = useState('Все');
+  const [priceRange, setPriceRange] = useState(0); // индекс в PRICE_RANGES
+  const [sortOrder, setSortOrder] = useState<'none' | 'asc' | 'desc'>('none');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     try {
@@ -85,21 +111,46 @@ export default function App() {
     }
   }, []);
 
-  // Считаем категории (по полю body) и количество в каждой
+  // Категории (по нормализованному body)
   const categories = useMemo(() => {
     const counts: Record<string, number> = {};
     cars.forEach(c => {
-      const b = (c as any).body || 'Прочее';
+      const b = normalizeBody((c as any).body);
       counts[b] = (counts[b] || 0) + 1;
     });
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, []);
 
-  // Отфильтрованные машины
+  // Фильтрация + поиск + сортировка
   const filteredCars = useMemo(() => {
-    if (bodyFilter === 'Все') return cars;
-    return cars.filter(c => ((c as any).body || 'Прочее') === bodyFilter);
-  }, [bodyFilter]);
+    let result = cars.slice();
+
+    // Фильтр по кузову
+    if (bodyFilter !== 'Все') {
+      result = result.filter(c => normalizeBody((c as any).body) === bodyFilter);
+    }
+
+    // Фильтр по цене
+    const range = PRICE_RANGES[priceRange];
+    result = result.filter(c => c.price >= range.min && c.price < range.max);
+
+    // Поиск по марке/модели
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      result = result.filter(c =>
+        `${c.brand} ${c.model}`.toLowerCase().includes(q)
+      );
+    }
+
+    // Сортировка
+    if (sortOrder === 'asc') {
+      result.sort((a, b) => a.price - b.price);
+    } else if (sortOrder === 'desc') {
+      result.sort((a, b) => b.price - a.price);
+    }
+
+    return result;
+  }, [bodyFilter, priceRange, sortOrder, search]);
 
   const price = selectedCar
     ? calcPrice(selectedCar.price, days)
@@ -111,7 +162,6 @@ export default function App() {
     if (!selectedCar || !phoneReady) return;
     setSending(true);
     setError('');
-
     const u = getTgUser();
 
     try {
@@ -134,9 +184,7 @@ export default function App() {
           tgLastName: u?.last_name ?? null,
         }),
       });
-
       if (!res.ok) throw new Error('Ошибка сервера');
-
       setSent(true);
       WebApp.HapticFeedback?.notificationOccurred('success');
     } catch (e) {
@@ -150,11 +198,14 @@ export default function App() {
   if (sent) {
     return (
       <div className="wrap">
-        <h1>✅ Заявка отправлена!</h1>
-        <p>Менеджер свяжется с вами в течение 15 минут.</p>
-        <button className="primary" onClick={() => { setSent(false); setSelectedCar(null); }}>
-          Выбрать ещё авто
-        </button>
+        <div className="success-box">
+          <div className="success-icon">✓</div>
+          <h1>Заявка отправлена!</h1>
+          <p className="sub">Менеджер свяжется с вами в течение 15 минут.</p>
+          <button className="primary" onClick={() => { setSent(false); setSelectedCar(null); }}>
+            Выбрать ещё авто
+          </button>
+        </div>
       </div>
     );
   }
@@ -163,18 +214,31 @@ export default function App() {
     return (
       <div className="wrap">
         <button className="back" onClick={() => setSelectedCar(null)}>← Назад</button>
-        <img src={selectedCar.photo} alt="" className="big-photo" />
-        <h1>
+
+        <div className="hero-photo">
+          <img src={selectedCar.photo} alt="" className="big-photo" />
+        </div>
+
+        <h1 className="detail-title">
           {selectedCar.brand} {selectedCar.model}
           {selectedCar.year > 0 ? `, ${selectedCar.year}` : ''}
         </h1>
-        <p className="sub">
+
+        <p className="detail-specs">
           {selectedCar.transmission} · {selectedCar.fuel}
           {selectedCar.color ? ` · ${selectedCar.color}` : ''}
-          {selectedCar.body ? ` · ${selectedCar.body}` : ''}
+          {selectedCar.body ? ` · ${normalizeBody(selectedCar.body)}` : ''}
         </p>
-        <p className="price-big">{selectedCar.price} ₽ / сутки</p>
-        <p className="deposit">Залог: {selectedCar.deposit} ₽</p>
+
+        <div className="detail-price-row">
+          <div>
+            <div className="price-big">{selectedCar.price} ₽</div>
+            <div className="price-label">за сутки</div>
+          </div>
+          <div className="deposit-chip">
+            Залог {selectedCar.deposit} ₽
+          </div>
+        </div>
 
         <label>Сколько суток?</label>
         <input type="number" min={1} value={days}
@@ -227,11 +291,27 @@ export default function App() {
 
   return (
     <div className="wrap">
-      <h1>Аренда авто в СПб</h1>
-      <p className="sub">
-        {filteredCars.length} из {cars.length} машин · скидки до 20%
-      </p>
+      <header className="app-header">
+        <div className="brand">
+          <span className="brand-black">Black</span><span className="brand-orange">Rent</span>
+        </div>
+        <div className="brand-tagline">Премиум аренда · СПб</div>
+      </header>
 
+      <div className="search-box">
+        <span className="search-icon">🔍</span>
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Поиск по марке или модели"
+        />
+        {search && (
+          <button className="search-clear" onClick={() => setSearch('')}>✕</button>
+        )}
+      </div>
+
+      {/* Фильтры по кузову */}
       <div className="filters">
         <button
           className={`filter-btn ${bodyFilter === 'Все' ? 'active' : ''}`}
@@ -250,22 +330,68 @@ export default function App() {
         ))}
       </div>
 
+      {/* Ценовые фильтры */}
+      <div className="filters">
+        {PRICE_RANGES.map((r, i) => (
+          <button
+            key={r.label}
+            className={`filter-btn price-filter ${priceRange === i ? 'active' : ''}`}
+            onClick={() => setPriceRange(i)}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Сортировка + счётчик */}
+      <div className="catalog-bar">
+        <span className="counter">
+          {filteredCars.length} {plural(filteredCars.length, 'машина', 'машины', 'машин')}
+        </span>
+        <button
+          className={`sort-btn ${sortOrder !== 'none' ? 'active' : ''}`}
+          onClick={() => {
+            setSortOrder(sortOrder === 'none' ? 'asc' : sortOrder === 'asc' ? 'desc' : 'none');
+          }}
+        >
+          {sortOrder === 'none' && 'По цене ↕'}
+          {sortOrder === 'asc' && 'Дешевле ↑'}
+          {sortOrder === 'desc' && 'Дороже ↓'}
+        </button>
+      </div>
+
       {filteredCars.length === 0 && (
-        <p className="empty">В этой категории пока нет машин</p>
+        <div className="empty-box">
+          <div className="empty-icon">🚗</div>
+          <p className="empty">Ничего не найдено</p>
+          <p className="empty-hint">Попробуйте изменить фильтры или поиск</p>
+        </div>
       )}
 
       {filteredCars.map(car => (
         <div key={car.id} className="card" onClick={() => setSelectedCar(car)}>
-          <img src={car.photo} alt="" />
+          <div className="card-photo">
+            <img src={car.photo} alt="" />
+          </div>
           <div className="info">
             <b>{car.brand} {car.model}</b>
             <span className="car-sub">
               {car.year > 0 ? `${car.year} · ` : ''}{car.transmission}
+              {car.body ? ` · ${normalizeBody(car.body)}` : ''}
             </span>
-            <span className="price">{car.price} ₽ / сутки</span>
+            <span className="price">{car.price} ₽<span className="price-unit">/сутки</span></span>
           </div>
         </div>
       ))}
     </div>
   );
+}
+
+// Склонение слов
+function plural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+  return many;
 }
