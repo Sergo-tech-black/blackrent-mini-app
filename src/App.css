@@ -41,29 +41,27 @@ body {
 /* ===== ШАПКА ===== */
 .app-header {
   text-align: center;
-  padding: 8px 0 20px;
+  padding: 18px 0 24px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 18px;
 }
 
 .brand {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-}
-
-.brand-black { color: #fff; }
-.brand-orange {
-  background: var(--brand-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  color: #ffffff;
+  line-height: 1;
+  font-family: -apple-system, system-ui, sans-serif;
 }
 
 .brand-tagline {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
-  margin-top: 4px;
+  margin-top: 10px;
+  font-weight: 500;
 }
 
 /* ===== ПОИСК ===== */

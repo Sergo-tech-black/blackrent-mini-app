@@ -94,7 +94,7 @@ export default function App() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [bodyFilter, setBodyFilter] = useState('Все');
-  const [priceRange, setPriceRange] = useState(0); // индекс в PRICE_RANGES
+  const [priceRange, setPriceRange] = useState(0);
   const [sortOrder, setSortOrder] = useState<'none' | 'asc' | 'desc'>('none');
   const [search, setSearch] = useState('');
 
@@ -111,7 +111,6 @@ export default function App() {
     }
   }, []);
 
-  // Категории (по нормализованному body)
   const categories = useMemo(() => {
     const counts: Record<string, number> = {};
     cars.forEach(c => {
@@ -121,20 +120,16 @@ export default function App() {
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, []);
 
-  // Фильтрация + поиск + сортировка
   const filteredCars = useMemo(() => {
     let result = cars.slice();
 
-    // Фильтр по кузову
     if (bodyFilter !== 'Все') {
       result = result.filter(c => normalizeBody((c as any).body) === bodyFilter);
     }
 
-    // Фильтр по цене
     const range = PRICE_RANGES[priceRange];
     result = result.filter(c => c.price >= range.min && c.price < range.max);
 
-    // Поиск по марке/модели
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       result = result.filter(c =>
@@ -142,7 +137,6 @@ export default function App() {
       );
     }
 
-    // Сортировка
     if (sortOrder === 'asc') {
       result.sort((a, b) => a.price - b.price);
     } else if (sortOrder === 'desc') {
@@ -292,10 +286,8 @@ export default function App() {
   return (
     <div className="wrap">
       <header className="app-header">
-        <div className="brand">
-          <span className="brand-black">Black</span><span className="brand-orange">Rent</span>
-        </div>
-        <div className="brand-tagline">Премиум аренда · СПб</div>
+        <div className="brand">BlackRent</div>
+        <div className="brand-tagline">Аренда авто в Санкт-Петербург</div>
       </header>
 
       <div className="search-box">
@@ -311,7 +303,6 @@ export default function App() {
         )}
       </div>
 
-      {/* Фильтры по кузову */}
       <div className="filters">
         <button
           className={`filter-btn ${bodyFilter === 'Все' ? 'active' : ''}`}
@@ -330,7 +321,6 @@ export default function App() {
         ))}
       </div>
 
-      {/* Ценовые фильтры */}
       <div className="filters">
         {PRICE_RANGES.map((r, i) => (
           <button
@@ -343,7 +333,6 @@ export default function App() {
         ))}
       </div>
 
-      {/* Сортировка + счётчик */}
       <div className="catalog-bar">
         <span className="counter">
           {filteredCars.length} {plural(filteredCars.length, 'машина', 'машины', 'машин')}
