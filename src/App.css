@@ -790,3 +790,65 @@ button.primary:disabled {
   border-color: rgba(120, 120, 120, 0.5);
   color: #aaa;
 }
+/* ===== АДМИН: ДАТА ВОЗВРАТА ===== */
+.admin-row-until {
+  font-size: 12px;
+  color: #f87171;
+  font-weight: 600;
+  margin: -4px 0 8px;
+}
+
+/* ===== АДМИН: РЕДАКТИРОВАНИЕ ЦЕНЫ ===== */
+.admin-row-price {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 149, 0, 0.06);
+  border: 1px solid rgba(255, 149, 0, 0.2);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+.admin-price-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.admin-price-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.admin-price-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--brand-orange);
+}
+
+.admin-price-old {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.admin-price-edit {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 149, 0, 0.4);
+  background: transparent;
+  color: var(--brand-orange);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.admin-price-edit:active { transform: scale(0.95); }
+.admin-price-edit:hover { background: rgba(255, 149, 0, 0.15); }

@@ -5,8 +5,9 @@ import './App.css';
 
 type Car = typeof cars[0];
 type CarStatus = 'available' | 'busy' | 'service';
+type StatusMap = Record<string, { status: CarStatus; busyUntil?: string }>;
+type PriceMap = Record<string, number>;
 
-// 👤 Ваш Telegram ID — только вы видите кнопку управления
 const ADMIN_IDS = ['1848294582'];
 
 const DISCOUNTS = [
@@ -26,6 +27,7 @@ const PRICE_RANGES = [
 const QUICK_DAYS = [1, 3, 5, 7, 10, 14, 30];
 const MANAGER_PHONE = '+79990000000';
 const MANAGER_TG = 'blackrent_spb';
+const API = 'https://blackrent-mini-app.vercel.app';
 
 function getDiscountPercent(days: number): number {
   for (const d of DISCOUNTS) {
@@ -65,7 +67,7 @@ function getInitData(): string {
 
 function isAdminUser(): boolean {
   const u = getTgUser();
-  return u?.id && ADMIN_IDS.includes(String(u.id));
+  return !!u?.id && ADMIN_IDS.includes(String(u.id));
 }
 
 function formatPhone(value: string): string {
@@ -116,7 +118,6 @@ function formatBusyUntil(dateStr?: string): string {
   }
 }
 
-// Дата возврата в будущем?
 function isStillBusy(busyUntil?: string): boolean {
   if (!busyUntil) return true;
   const end = new Date(busyUntil);
@@ -124,8 +125,6 @@ function isStillBusy(busyUntil?: string): boolean {
   end.setHours(23, 59, 59, 999);
   return end.getTime() >= Date.now();
 }
-
-type StatusMap = Record<string, { status: CarStatus; busyUntil?: string }>;
 
 function getStatus(id: number, map: StatusMap): CarStatus {
   const entry = map[String(id)];
@@ -161,9 +160,11 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [statusMap, setStatusMap] = useState<StatusMap>({});
+  const [priceMap, setPriceMap] = useState<PriceMap>({});
   const [showAdmin, setShowAdmin] = useState(false);
+  const [adminFilter, setAdminFilter] = useState<'all' | 'busy' | 'available' | 'service'>('all');
+  const [adminSearch, setAdminSearch] = useState('');
 
-  // Загружаем статусы из API при старте
   useEffect(() => {
     try {
       (window as any).Telegram?.WebApp?.ready?.();
@@ -175,20 +176,25 @@ export default function App() {
     } catch (e) {
       console.log('Telegram WebApp недоступен', e);
     }
-
-    loadStatuses();
+    loadData();
   }, []);
 
-  async function loadStatuses() {
+  async function loadData() {
     try {
-      const res = await fetch('https://blackrent-mini-app.vercel.app/api/statuses');
+      const res = await fetch(`${API}/api/statuses`);
       if (res.ok) {
         const data = await res.json();
-        setStatusMap(data || {});
+        setStatusMap(data.statuses || {});
+        setPriceMap(data.prices || {});
       }
     } catch (e) {
-      console.warn('Не удалось загрузить статусы', e);
+      console.warn('Не удалось загрузить данные', e);
     }
+  }
+
+  function getCarPrice(car: any): number {
+    const override = priceMap[String(car.id)];
+    return typeof override === 'number' ? override : car.price;
   }
 
   const categories = useMemo(() => {
@@ -208,7 +214,10 @@ export default function App() {
     }
 
     const range = PRICE_RANGES[priceRange];
-    result = result.filter(c => c.price >= range.min && c.price < range.max);
+    result = result.filter(c => {
+      const p = getCarPrice(c);
+      return p >= range.min && p < range.max;
+    });
 
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -221,14 +230,15 @@ export default function App() {
       result = result.filter(c => getStatus(c.id, statusMap) === 'available');
     }
 
-    if (sortOrder === 'asc') result.sort((a, b) => a.price - b.price);
-    else if (sortOrder === 'desc') result.sort((a, b) => b.price - a.price);
+    if (sortOrder === 'asc') result.sort((a, b) => getCarPrice(a) - getCarPrice(b));
+    else if (sortOrder === 'desc') result.sort((a, b) => getCarPrice(b) - getCarPrice(a));
 
     return result;
-  }, [bodyFilter, priceRange, sortOrder, search, onlyAvailable, statusMap]);
+  }, [bodyFilter, priceRange, sortOrder, search, onlyAvailable, statusMap, priceMap]);
 
+  const selectedPrice = selectedCar ? getCarPrice(selectedCar) : 0;
   const price = selectedCar
-    ? calcPrice(selectedCar.price, days)
+    ? calcPrice(selectedPrice, days)
     : { base: 0, percent: 0, discount: 0, total: 0 };
 
   const phoneReady = isPhoneComplete(phone);
@@ -248,13 +258,13 @@ export default function App() {
     const u = getTgUser();
 
     try {
-      const res = await fetch('https://blackrent-mini-app.vercel.app/api/booking', {
+      const res = await fetch(`${API}/api/booking`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           car: `${selectedCar.brand} ${selectedCar.model}`,
           days,
-          pricePerDay: selectedCar.price,
+          pricePerDay: selectedPrice,
           base: price.base,
           discount: price.discount,
           percent: price.percent,
@@ -278,17 +288,13 @@ export default function App() {
     }
   }
 
-  // ===== АДМИН-ПАНЕЛЬ =====
-  async function updateStatus(
-    carId: number,
-    newStatus: CarStatus,
-    busyUntil?: string
-  ) {
+  async function updateStatus(carId: number, newStatus: CarStatus, busyUntil?: string) {
     try {
-      const res = await fetch('https://blackrent-mini-app.vercel.app/api/statuses', {
+      const res = await fetch(`${API}/api/statuses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          type: 'status',
           id: carId,
           status: newStatus,
           busyUntil,
@@ -297,7 +303,8 @@ export default function App() {
       });
       if (!res.ok) throw new Error('Ошибка сервера');
       const data = await res.json();
-      setStatusMap(data.data || {});
+      setStatusMap(data.statuses || {});
+      setPriceMap(data.prices || {});
       WebApp.HapticFeedback?.notificationOccurred('success');
     } catch (e) {
       console.error(e);
@@ -305,7 +312,29 @@ export default function App() {
     }
   }
 
-  // ===== ЭКРАН УСПЕХА =====
+  async function updatePrice(carId: number, newPrice: number) {
+    try {
+      const res = await fetch(`${API}/api/statuses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'price',
+          id: carId,
+          price: newPrice,
+          initData: getInitData(),
+        }),
+      });
+      if (!res.ok) throw new Error('Ошибка сервера');
+      const data = await res.json();
+      setStatusMap(data.statuses || {});
+      setPriceMap(data.prices || {});
+      WebApp.HapticFeedback?.notificationOccurred('success');
+    } catch (e) {
+      console.error(e);
+      WebApp.showAlert?.('Не удалось сохранить цену');
+    }
+  }
+
   if (sent) {
     return (
       <div className="wrap">
@@ -323,53 +352,167 @@ export default function App() {
 
   // ===== АДМИН-ПАНЕЛЬ =====
   if (showAdmin) {
+    const counts = { all: cars.length, busy: 0, available: 0, service: 0 };
+    cars.forEach(c => {
+      const s = getStatus(c.id, statusMap);
+      if (s === 'busy') counts.busy++;
+      else if (s === 'service') counts.service++;
+      else counts.available++;
+    });
+
+    const adminCars = cars.filter(car => {
+      const s = getStatus(car.id, statusMap);
+      if (adminFilter === 'busy' && s !== 'busy') return false;
+      if (adminFilter === 'available' && s !== 'available') return false;
+      if (adminFilter === 'service' && s !== 'service') return false;
+      if (adminSearch.trim()) {
+        const q = adminSearch.trim().toLowerCase();
+        const hay = `${car.brand} ${car.model}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
     return (
       <div className="wrap">
         <button className="back" onClick={() => setShowAdmin(false)}>← Назад к каталогу</button>
-        <h1 className="admin-title">Управление статусами</h1>
+        <h1 className="admin-title">Управление автопарком</h1>
         <p className="admin-hint">
-          Отметьте машины, которые сейчас в аренде или на ТО.
-          Клиенты сразу увидят это в каталоге.
+          Меняйте статусы и цены — клиенты сразу видят изменения.
         </p>
 
-        <div className="admin-list">
-          {cars.map(car => {
-            const status = getStatus(car.id, statusMap);
-            const entry = statusMap[String(car.id)];
-            return (
-              <div key={car.id} className="admin-row">
-                <div className="admin-row-info">
-                  <b>{car.brand} {car.model}</b>
-                  <span className="admin-row-id">ID: {car.id}</span>
-                </div>
-                <div className="admin-row-actions">
-                  <button
-                    className={`admin-btn ${status === 'available' ? 'active-green' : ''}`}
-                    onClick={() => updateStatus(car.id, 'available')}
-                  >
-                    Свободна
-                  </button>
-                  <button
-                    className={`admin-btn ${status === 'busy' ? 'active-red' : ''}`}
-                    onClick={() => {
-                      const input = prompt('Дата возврата (ГГГГ-ММ-ДД), можно пусто:', entry?.busyUntil || '');
-                      if (input === null) return;
-                      updateStatus(car.id, 'busy', input.trim() || undefined);
-                    }}
-                  >
-                    Занята
-                  </button>
-                  <button
-                    className={`admin-btn ${status === 'service' ? 'active-gray' : ''}`}
-                    onClick={() => updateStatus(car.id, 'service')}
-                  >
-                    ТО
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+        <div className="search-box">
+          <span className="search-icon">🔍</span>
+          <input
+            type="text"
+            value={adminSearch}
+            onChange={e => setAdminSearch(e.target.value)}
+            placeholder="Поиск по марке или модели"
+          />
+          {adminSearch && (
+            <button className="search-clear" onClick={() => setAdminSearch('')}>✕</button>
+          )}
         </div>
+
+        <div className="filters">
+          <button
+            className={`filter-btn ${adminFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setAdminFilter('all')}
+          >
+            Все ({counts.all})
+          </button>
+          <button
+            className={`filter-btn ${adminFilter === 'busy' ? 'active' : ''}`}
+            onClick={() => setAdminFilter('busy')}
+          >
+            Занятые ({counts.busy})
+          </button>
+          <button
+            className={`filter-btn ${adminFilter === 'available' ? 'active' : ''}`}
+            onClick={() => setAdminFilter('available')}
+          >
+            Свободные ({counts.available})
+          </button>
+          <button
+            className={`filter-btn ${adminFilter === 'service' ? 'active' : ''}`}
+            onClick={() => setAdminFilter('service')}
+          >
+            На ТО ({counts.service})
+          </button>
+        </div>
+
+        <div className="catalog-bar">
+          <span className="counter">
+            Найдено: {adminCars.length} {plural(adminCars.length, 'машина', 'машины', 'машин')}
+          </span>
+        </div>
+
+        {adminCars.length === 0 ? (
+          <div className="empty-box">
+            <div className="empty-icon">🔎</div>
+            <p className="empty">Ничего не найдено</p>
+            <p className="empty-hint">Измените фильтр или поиск</p>
+          </div>
+        ) : (
+          <div className="admin-list">
+            {adminCars.map(car => {
+              const status = getStatus(car.id, statusMap);
+              const entry = statusMap[String(car.id)];
+              const currentPrice = getCarPrice(car);
+              const basePrice = car.price;
+              const priceChanged = currentPrice !== basePrice;
+              return (
+                <div key={car.id} className="admin-row">
+                  <div className="admin-row-info">
+                    <b>{car.brand} {car.model}</b>
+                    <span className="admin-row-id">ID: {car.id}</span>
+                  </div>
+
+                  {status === 'busy' && entry?.busyUntil && (
+                    <div className="admin-row-until">
+                      Занята до {formatBusyUntil(entry.busyUntil)}
+                    </div>
+                  )}
+
+                  <div className="admin-row-price">
+                    <div className="admin-price-main">
+                      <span className="admin-price-label">Цена:</span>
+                      <span className="admin-price-value">{currentPrice.toLocaleString('ru-RU')} ₽</span>
+                      {priceChanged && (
+                        <span className="admin-price-old">
+                          было {basePrice.toLocaleString('ru-RU')} ₽
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      className="admin-price-edit"
+                      onClick={() => {
+                        const input = prompt(
+                          `Новая цена за сутки для ${car.brand} ${car.model}:`,
+                          String(currentPrice)
+                        );
+                        if (input === null) return;
+                        const val = Number(input.replace(/\D/g, ''));
+                        if (!Number.isFinite(val) || val <= 0) {
+                          WebApp.showAlert?.('Введите корректное число');
+                          return;
+                        }
+                        updatePrice(car.id, val);
+                      }}
+                    >
+                      ✏️ Изменить
+                    </button>
+                  </div>
+
+                  <div className="admin-row-actions">
+                    <button
+                      className={`admin-btn ${status === 'available' ? 'active-green' : ''}`}
+                      onClick={() => updateStatus(car.id, 'available')}
+                    >
+                      Свободна
+                    </button>
+                    <button
+                      className={`admin-btn ${status === 'busy' ? 'active-red' : ''}`}
+                      onClick={() => {
+                        const input = prompt('Дата возврата (ГГГГ-ММ-ДД), можно пусто:', entry?.busyUntil || '');
+                        if (input === null) return;
+                        updateStatus(car.id, 'busy', input.trim() || undefined);
+                      }}
+                    >
+                      Занята
+                    </button>
+                    <button
+                      className={`admin-btn ${status === 'service' ? 'active-gray' : ''}`}
+                      onClick={() => updateStatus(car.id, 'service')}
+                    >
+                      ТО
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }
@@ -408,12 +551,12 @@ export default function App() {
 
         <div className="detail-price-card">
           <div className="detail-price-left">
-            <div className="price-big">{selectedCar.price} ₽</div>
+            <div className="price-big">{selectedPrice.toLocaleString('ru-RU')} ₽</div>
             <div className="price-label">за сутки</div>
           </div>
           <div className="detail-price-right">
             <div className="deposit-label">Залог</div>
-            <div className="deposit-value">{selectedCar.deposit} ₽</div>
+            <div className="deposit-value">{selectedCar.deposit.toLocaleString('ru-RU')} ₽</div>
           </div>
         </div>
 
@@ -490,6 +633,7 @@ export default function App() {
             {similarCars.map(car => {
               const s = getStatus(car.id, statusMap);
               const i = statusInfo(s, statusMap[String(car.id)]?.busyUntil);
+              const p = getCarPrice(car);
               return (
                 <div
                   key={car.id}
@@ -508,7 +652,7 @@ export default function App() {
                     <span className="car-sub">
                       {car.year > 0 ? `${car.year} · ` : ''}{car.transmission}
                     </span>
-                    <span className="price">{car.price} ₽<span className="price-unit">/сутки</span></span>
+                    <span className="price">{p.toLocaleString('ru-RU')} ₽<span className="price-unit">/сутки</span></span>
                   </div>
                 </div>
               );
@@ -529,7 +673,7 @@ export default function App() {
 
       {isAdminUser() && (
         <button className="admin-open-btn" onClick={() => setShowAdmin(true)}>
-          ⚙️ Управление статусами
+          ⚙️ Управление автопарком
         </button>
       )}
 
@@ -611,6 +755,7 @@ export default function App() {
         const s = getStatus(car.id, statusMap);
         const info = statusInfo(s, statusMap[String(car.id)]?.busyUntil);
         const isUnavailable = s !== 'available';
+        const p = getCarPrice(car);
         return (
           <div
             key={car.id}
@@ -627,7 +772,7 @@ export default function App() {
                 {car.year > 0 ? `${car.year} · ` : ''}{car.transmission}
                 {car.body ? ` · ${normalizeBody(car.body)}` : ''}
               </span>
-              <span className="price">{car.price} ₽<span className="price-unit">/сутки</span></span>
+              <span className="price">{p.toLocaleString('ru-RU')} ₽<span className="price-unit">/сутки</span></span>
             </div>
           </div>
         );
